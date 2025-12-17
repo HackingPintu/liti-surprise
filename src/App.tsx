@@ -77,9 +77,9 @@ const BACKGROUND_FADE_START = Math.max(
 );
 
 const TYPED_LINES = [
-  "> tina",
+  "> liti",
   "...",
-  "> today is your birthday",
+  "> today's a special day",
   "...",
   "> so i made you this computer program",
   "...",
