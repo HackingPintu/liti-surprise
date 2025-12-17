@@ -77,9 +77,9 @@ const BACKGROUND_FADE_START = Math.max(
 );
 
 const TYPED_LINES = [
-  "> tina",
+  "> liti",
   "...",
-  "> today is your birthday",
+  "> today is a special day",
   "...",
   "> so i made you this computer program",
   "...",
@@ -265,25 +265,44 @@ function AnimatedScene({
     <>
       <group ref={tableGroup}>
         <Table />
+        {/* FRAME 1: Back Right */}
         <PictureFrame
+          id="frame_back_right"
+          isActive={activeCardId === "frame_back_right"}
+          onToggle={onToggleCard} /* <--- FIXED: Changed from handleCardToggle */
           image="/frame2.jpg"
           position={[0, 0.735, 3]}
           rotation={[0, 5.6, 0]}
           scale={0.75}
         />
+
+        {/* FRAME 2: Front Right */}
         <PictureFrame
+          id="frame_front_right"
+          isActive={activeCardId === "frame_front_right"}
+          onToggle={onToggleCard} /* <--- FIXED */
           image="/frame3.jpg"
           position={[0, 0.735, -3]}
           rotation={[0, 4.0, 0]}
           scale={0.75}
         />
+
+        {/* FRAME 3: Back Left */}
         <PictureFrame
+          id="frame_back_left"
+          isActive={activeCardId === "frame_back_left"}
+          onToggle={onToggleCard} /* <--- FIXED */
           image="/frame4.jpg"
           position={[-1.5, 0.735, 2.5]}
           rotation={[0, 5.4, 0]}
           scale={0.75}
         />
+
+        {/* FRAME 4: Front Left */}
         <PictureFrame
+          id="frame_front_left"
+          isActive={activeCardId === "frame_front_left"}
+          onToggle={onToggleCard} /* <--- FIXED */
           image="/frame1.jpg"
           position={[-1.5, 0.735, -2.5]}
           rotation={[0, 4.2, 0]}
