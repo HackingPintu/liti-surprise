@@ -20,6 +20,8 @@ import { BirthdayCard } from "./components/BirthdayCard";
 
 import "./App.css";
 
+// --- HELPER FUNCTIONS ---
+
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
 
@@ -27,16 +29,7 @@ const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
 
 const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 
-type AnimatedSceneProps = {
-  isPlaying: boolean;
-  onBackgroundFadeChange?: (opacity: number) => void;
-  onEnvironmentProgressChange?: (progress: number) => void;
-  candleLit: boolean;
-  onAnimationComplete?: () => void;
-  cards: ReadonlyArray<BirthdayCardConfig>;
-  activeCardId: string | null;
-  onToggleCard: (id: string) => void;
-};
+// --- CONFIGURATION CONSTANTS ---
 
 const CAKE_START_Y = 10;
 const CAKE_END_Y = 0;
@@ -101,9 +94,22 @@ const BIRTHDAY_CARDS: ReadonlyArray<BirthdayCardConfig> = [
     id: "confetti",
     image: "/card.png",
     position: [1, 0.081, -2],
-    rotation: [-Math.PI / 2 , 0, Math.PI / 3],
-  }
+    rotation: [-Math.PI / 2, 0, Math.PI / 3],
+  },
 ];
+
+// --- COMPONENTS ---
+
+type AnimatedSceneProps = {
+  isPlaying: boolean;
+  onBackgroundFadeChange?: (opacity: number) => void;
+  onEnvironmentProgressChange?: (progress: number) => void;
+  candleLit: boolean;
+  onAnimationComplete?: () => void;
+  cards: ReadonlyArray<BirthdayCardConfig>;
+  activeCardId: string | null;
+  onToggleCard: (id: string) => void;
+};
 
 function AnimatedScene({
   isPlaying,
@@ -194,11 +200,7 @@ function AnimatedScene({
     const cakeProgress = clamp(clampedElapsed / CAKE_DESCENT_DURATION, 0, 1);
     const cakeEase = easeOutCubic(cakeProgress);
     cake.position.y = lerp(CAKE_START_Y, CAKE_END_Y, cakeEase);
-    cake.position.x = 0;
-    cake.position.z = 0;
     cake.rotation.y = cakeEase * Math.PI * 2;
-    cake.rotation.x = 0;
-    cake.rotation.z = 0;
 
     let tableZ = TABLE_START_Z;
     if (clampedElapsed >= TABLE_SLIDE_START) {
@@ -211,7 +213,6 @@ function AnimatedScene({
       tableZ = lerp(TABLE_START_Z, TABLE_END_Z, tableEase);
     }
     table.position.set(0, 0, tableZ);
-    table.rotation.set(0, 0, 0);
 
     if (clampedElapsed >= CANDLE_DROP_START) {
       if (!candle.visible) {
@@ -356,18 +357,21 @@ function EnvironmentBackgroundController({
 
   useEffect(() => {
     if ("backgroundIntensity" in scene) {
-      // Cast required because older typings might not include backgroundIntensity yet.
-      (scene as typeof scene & { backgroundIntensity: number }).backgroundIntensity =
-        intensity;
+      (
+        scene as typeof scene & { backgroundIntensity: number }
+      ).backgroundIntensity = intensity;
     }
   }, [scene, intensity]);
 
   return null;
 }
 
+// --- MAIN APPLICATION COMPONENT ---
 
 export default function App() {
+  // START AS FALSE: Allows us to show the "Click to Start" screen
   const [hasStarted, setHasStarted] = useState(false);
+  
   const [backgroundOpacity, setBackgroundOpacity] = useState(1);
   const [environmentProgress, setEnvironmentProgress] = useState(0);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
@@ -378,34 +382,38 @@ export default function App() {
   const [isCandleLit, setIsCandleLit] = useState(true);
   const [fireworksActive, setFireworksActive] = useState(false);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
+
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
   const backgroundAudioRef = useRef<HTMLAudioElement | null>(null);
 
+  // 1. Initialize Audio (But do not play yet)
   useEffect(() => {
     const audio = new Audio("/music.mp3");
     audio.loop = true;
     audio.preload = "auto";
     backgroundAudioRef.current = audio;
+
     return () => {
       audio.pause();
       backgroundAudioRef.current = null;
     };
   }, []);
 
-  const playBackgroundMusic = useCallback(() => {
-    const audio = backgroundAudioRef.current;
-    if (!audio) {
-      return;
+  // 2. The Start Trigger
+  const handleStartExperience = useCallback(() => {
+    // Play Audio (This is allowed now because it's inside a user click event)
+    if (backgroundAudioRef.current) {
+        backgroundAudioRef.current.currentTime = 0;
+        backgroundAudioRef.current.play().catch((e) => console.log("Audio error", e));
     }
-    if (!audio.paused) {
-      return;
-    }
-    audio.currentTime = 0;
-    void audio.play().catch(() => {
-      // ignore play errors (browser might block)
-    });
+    
+    // Start Animation
+    setHasStarted(true);
   }, []);
 
+  // 3. Typing Logic
   const typingComplete = currentLineIndex >= TYPED_LINES.length;
+
   const typedLines = useMemo(() => {
     if (TYPED_LINES.length === 0) {
       return [""];
@@ -432,6 +440,7 @@ export default function App() {
 
   useEffect(() => {
     if (!hasStarted) {
+      // RESET LOGIC: Ensure when we start, we start from zero
       setCurrentLineIndex(0);
       setCurrentCharIndex(0);
       setSceneStarted(false);
@@ -486,26 +495,24 @@ export default function App() {
     return () => window.clearInterval(handle);
   }, []);
 
+  // 4. Candle Logic
+  const blowOutCandle = useCallback(() => {
+    if (hasAnimationCompleted && isCandleLit) {
+      setIsCandleLit(false);
+      setFireworksActive(true);
+    }
+  }, [hasAnimationCompleted, isCandleLit]);
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.code !== "Space" && event.key !== " ") {
-        return;
-      }
-      event.preventDefault();
-      if (!hasStarted) {
-        playBackgroundMusic();
-        setHasStarted(true);
-        return;
-      }
-      if (hasAnimationCompleted && isCandleLit) {
-        setIsCandleLit(false);
-        setFireworksActive(true);
+      if (event.code === "Space" || event.key === " ") {
+        event.preventDefault();
+        blowOutCandle();
       }
     };
-
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [hasStarted, hasAnimationCompleted, isCandleLit, playBackgroundMusic]);
+  }, [blowOutCandle]);
 
   const handleCardToggle = useCallback((id: string) => {
     setActiveCardId((current) => (current === id ? null : id));
@@ -515,38 +522,65 @@ export default function App() {
 
   return (
     <div className="App">
-      <div
-        className="background-overlay"
-        style={{ opacity: backgroundOpacity }}
-      >
-        <div className="typed-text">
-          {typedLines.map((line, index) => {
-            const showCursor =
-              cursorVisible &&
-              index === cursorTargetIndex &&
-              (!typingComplete || !sceneStarted);
-            return (
-              <span className="typed-line" key={`typed-line-${index}`}>
-                {line || "\u00a0"}
-                {showCursor && (
-                  <span aria-hidden="true" className="typed-cursor">
-                    _
-                  </span>
-                )}
-              </span>
-            );
-          })}
+      {/* --- CLICK TO START OVERLAY --- */}
+      {!hasStarted && (
+        <div className="start-screen" onClick={handleStartExperience}>
+            <h1>Surprise Girl Kitty 🐱</h1>
+            <p>{isMobile ? "Tap to Start" : "Click to Start"}</p>
         </div>
-      </div>
-      {hasAnimationCompleted && isCandleLit && (
-        <div className="hint-overlay">press space to blow out the candle</div>
       )}
+
+      {/* --- TYPING TEXT OVERLAY (Only shows after start) --- */}
+      {hasStarted && (
+        <div
+            className="background-overlay"
+            style={{ opacity: backgroundOpacity }}
+        >
+            <div className="typed-text">
+            {typedLines.map((line, index) => {
+                const showCursor =
+                cursorVisible &&
+                index === cursorTargetIndex &&
+                (!typingComplete || !sceneStarted);
+                return (
+                <span className="typed-line" key={`typed-line-${index}`}>
+                    {line || "\u00a0"}
+                    {showCursor && (
+                    <span aria-hidden="true" className="typed-cursor">
+                        _
+                    </span>
+                    )}
+                    <br />
+                </span>
+                );
+            })}
+            </div>
+        </div>
+      )}
+
+      {/* --- INTERACTION BUTTON (Appears at end) --- */}
+      {hasAnimationCompleted && isCandleLit && (
+        <button
+          className="interaction-button"
+          onClick={(e) => {
+            e.stopPropagation();
+            blowOutCandle();
+          }}
+        >
+          {isMobile
+            ? "Tap here to make a wish"
+            : "Press Space or Click to make a wish"}
+        </button>
+      )}
+
+      {/* --- 3D SCENE --- */}
       <Canvas
         gl={{ alpha: true }}
         style={{ background: "transparent" }}
         onCreated={({ gl }) => {
           gl.setClearColor("#000000", 0);
         }}
+        onTouchMove={(e) => e.preventDefault()}
       >
         <Suspense fallback={null}>
           <AnimatedScene
@@ -560,7 +594,11 @@ export default function App() {
             onToggleCard={handleCardToggle}
           />
           <ambientLight intensity={(1 - environmentProgress) * 0.8} />
-          <directionalLight intensity={0.5} position={[2, 10, 0]} color={[1, 0.9, 0.95]}/>
+          <directionalLight
+            intensity={0.5}
+            position={[2, 10, 0]}
+            color={[1, 0.9, 0.95]}
+          />
           <Environment
             files={["/shanghai_bund_4k.hdr"]}
             backgroundRotation={[0, 3.3, 0]}
@@ -569,11 +607,9 @@ export default function App() {
             environmentIntensity={0.1 * environmentProgress}
             backgroundIntensity={0.05 * environmentProgress}
           />
-          <EnvironmentBackgroundController intensity={0.05 * environmentProgress} />
+          <EnvironmentBackgroundController
+            intensity={0.05 * environmentProgress}
+          />
           <Fireworks isActive={fireworksActive} origin={[0, 10, 0]} />
-          <ConfiguredOrbitControls />
-        </Suspense>
-      </Canvas>
-    </div>
-  );
+          <ConfiguredOrbitControls /> </Suspense> </Canvas> </div> );
 }
