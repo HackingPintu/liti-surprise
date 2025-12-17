@@ -77,7 +77,7 @@ const BACKGROUND_FADE_START = Math.max(
 );
 
 const TYPED_LINES = [
-  "> liti",
+  "> liti 💕",
   "...",
   "> today's a special day",
   "...",
